@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>IPTV Player</title>
+
+  <!-- iOS Web App -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.json">
+  <!-- Removed apple-touch-icon -->
+
+  <style>
+    :root { --bg:#0f1115; --fg:#e7e9ee; --muted:#9aa4b2; --accent:#6aa6ff; --card:#171a21; }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--fg);font:16px system-ui, -apple-system, Segoe UI, Roboto, sans-serif}
+    header{padding:12px 16px;border-bottom:1px solid #222;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#0b0d11;position:sticky;top:0;z-index:9}
+    header h1{margin:0;font-size:18px;font-weight:600}
+    header input[type="url"], header input[type="text"]{flex:1;min-width:220px;padding:10px 12px;border-radius:10px;border:1px solid #2a2f3a;background:var(--card);color:var(--fg);outline:none}
+    header .btn{padding:10px 14px;border-radius:10px;border:1px solid #2a2f3a;background:#1f2530;color:var(--fg);cursor:pointer}
+    header .btn:hover{border-color:#3a4252}
+    main{display:grid;grid-template-columns:340px 1fr;gap:12px;height:calc(100% - 62px)}
+    @media (max-width:900px){ main{grid-template-columns:1fr} #right{order:-1} }
+    #left{padding:12px;overflow:auto}
+    #right{padding:12px}
+    .card{background:var(--card);border:1px solid #232834;border-radius:14px;overflow:hidden}
+    .section{padding:12px;border-top:1px solid #1f232c}
+    #playlistInfo{padding:10px 12px;font-size:14px;color:var(--muted)}
+    #searchRow{display:flex;gap:8px}
+    #groups{width:40%}
+    #channels{max-height:50vh;overflow:auto}
+    .channel{display:flex;gap:10px;align-items:center;padding:10px 12px;border-top:1px solid #1f232c;cursor:pointer}
+    .channel:hover{background:#1a1f29}
+    .logo{width:32px;height:32px;border-radius:6px;background:#111;object-fit:contain}
+    .meta{display:flex;flex-direction:column;min-width:0}
+    .name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .sub{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .fav{margin-left:auto;font-size:18px;color:#f4d35e;opacity:.6}
+    .fav.on{opacity:1}
+    video{width:100%;max-height:70vh;background:#000;border-radius:14px;display:block}
+    #nowPlaying{padding:8px 0;color:var(--muted);font-size:14px}
+    .hint{font-size:12px;color:var(--muted)}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>IPTV Player</h1>
+    <input id="m3uUrl" type="url" placeholder="M3U/M3U8 URL einfügen…" enterkeyhint="go">
+    <button class="btn" id="loadUrlBtn">Laden</button>
+    <input id="m3uFile" type="file" accept=".m3u,.m3u8" class="btn">
+    <button class="btn" id="installBtn" hidden>Zum Home-Bildschirm</button>
+  </header>
+
+  <main>
+    <section id="left">
+      <div class="card">
+        <div id="playlistInfo">Keine Playlist geladen.</div>
+        <div class="section" id="searchRow">
+          <input id="search" type="text" placeholder="Suche…">
+          <select id="groups"><option value="">Alle Gruppen</option></select>
+          <button class="btn" id="showFavsBtn" title="Favoriten umschalten">★</button>
+        </div>
+        <div id="channels"></div>
+        <div class="section hint">Hinweis: Manche Streams erfordern HLS (.m3u8). DRM-geschützte Streams funktionieren nicht im Browser.</div>
+      </div>
+    </section>
+
+    <section id="right">
+      <div class="card" style="padding:12px">
+        <video id="player" playsinline controls x-webkit-airplay="allow"></video>
+        <div id="nowPlaying">—</div>
+        <div class="row">
+          <button class="btn" id="airplayBtn">AirPlay</button>
+          <button class="btn" id="pipBtn">Bild-in-Bild</button>
+          <a class="btn" id="openExtern" href="#" target="_blank" rel="noopener">Extern öffnen</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // ---- Utilities ----
+    const $ = s => document.querySelector(s);
+    const favKey = 'iptv-favorites';
+    const state = { channels: [], filtered: [], showFavs:false };
+
+    function parseAttrs(attrStr){
+      const attrs = {};
+      // Parse key="value" pairs in #EXTINF
+      attrStr.replace(/([A-Z0-9-]+)="(.*?)"/gi, (_,k,v)=> (attrs[k.toLowerCase()] = v));
+      return attrs;
+    }
+
+    function parseM3U(text){
+      const lines = text.replace(/\r/g,'').split('\n');
+      const out = [];
+      let current = null;
+      for (let i=0;i<lines.length;i++){
+        const line = lines[i].trim();
+        if (!line) continue;
+        if (line.startsWith('#EXTINF')){
+          const metaStr = line.substring(line.indexOf(':')+1);
+          const [attrPart, ...nameParts] = metaStr.split(',');
+          const attrs = parseAttrs(attrPart||'');
+          const name = nameParts.join(',').trim();
+          current = {
+            name: name || attrs['tvg-name'] || 'Unbenannt',
+            group: attrs['group-title'] || '',
+            logo: attrs['tvg-logo'] || '',
+            tvgId: attrs['tvg-id'] || '',
+            url: ''
+          };
+        } else if (!line.startsWith('#') && current){
+          current.url = line;
+          out.push(current);
+          current = null;
+        }
+      }
+      return out;
+    }
+
+    function loadFavorites(){
+      try { return JSON.parse(localStorage.getItem(favKey) || '{}'); }
+      catch{ return {}; }
+    }
+    function saveFavorites(f){ localStorage.setItem(favKey, JSON.stringify(f)); }
+
+    function renderChannels(){
+      const wrap = $('#channels');
+      wrap.innerHTML = '';
+      const favs = loadFavorites();
+      const q = ($('#search').value || '').toLowerCase();
+      const g = $('#groups').value;
+      state.filtered = state.channels.filter(c=>{
+        const matchQ = !q || c.name.toLowerCase().includes(q) || c.group.toLowerCase().includes(q);
+        const matchG = !g || c.group === g;
+        const matchFav = !state.showFavs || favs[c.url];
+        return matchQ && matchG && matchFav;
+      });
+      if (state.filtered.length === 0){
+        const div = document.createElement('div');
+        div.className = 'section';
+        div.textContent = 'Keine Kanäle gefunden.';
+        wrap.appendChild(div);
+        return;
+      }
+      state.filtered.forEach(ch=>{
+        const row = document.createElement('div');
+        row.className = 'channel';
+        row.onclick = ()=> playChannel(ch);
+        const img = document.createElement('img');
+        img.className = 'logo';
+        img.loading = 'lazy';
+        img.src = ch.logo || 'data:image/gif;base64,R0lGODlhAQABAIAAAP///////yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+        const meta = document.createElement('div'); meta.className = 'meta';
+        const name = document.createElement('div'); name.className = 'name'; name.textContent = ch.name;
+        const sub = document.createElement('div'); sub.className = 'sub'; sub.textContent = ch.group || ch.tvgId || ch.url;
+        const fav = document.createElement('div'); fav.className = 'fav'; fav.textContent = '★';
+        if (favs[ch.url]) fav.classList.add('on');
+        fav.onclick = (e)=>{ e.stopPropagation(); favs[ch.url] = !favs[ch.url]; if (!favs[ch.url]) delete favs[ch.url]; saveFavorites(favs); fav.classList.toggle('on'); };
+        meta.appendChild(name); meta.appendChild(sub);
+        row.appendChild(img); row.appendChild(meta); row.appendChild(fav);
+        wrap.appendChild(row);
+      });
+    }
+
+    function populateGroups(){
+      const sel = $('#groups');
+      const groups = Array.from(new Set(state.channels.map(c=>c.group).filter(Boolean))).sort();
+      sel.innerHTML = '<option value="">Alle Gruppen</option>' + groups.map(g=>`<option>${g}</option>`).join('');
+    }
+
+    async function handleUrlLoad(){
+      const url = $('#m3uUrl').value.trim();
+      if (!url) return;
+      try{
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('HTTP '+resp.status);
+        const text = await resp.text();
+        state.channels = parseM3U(text);
+        $('#playlistInfo').textContent = `Geladen: ${state.channels.length} Kanäle`;
+        populateGroups(); renderChannels();
+        localStorage.setItem('iptv-last-url', url);
+      }catch(e){
+        $('#playlistInfo').textContent = 'Fehler beim Laden der Playlist: ' + e.message + ' (Hinweis: CORS kann das Laden blockieren).';
+      }
+    }
+
+    async function handleFileLoad(file){
+      const text = await file.text();
+      state.channels = parseM3U(text);
+      $('#playlistInfo').textContent = `Datei: ${file.name} • ${state.channels.length} Kanäle`;
+      populateGroups(); renderChannels();
+    }
+
+    function playChannel(ch){
+      const v = $('#player');
+      // iOS/Safari: HLS (.m3u8) wird nativ unterstützt
+      v.src = ch.url;
+      v.play().catch(()=>{/* Autoplay blockiert bis Nutzer tippt */});
+      $('#nowPlaying').textContent = `Spielt: ${ch.name}`;
+      $('#openExtern').href = ch.url;
+      history.replaceState(null, '', location.pathname + (ch.tvgId ? `#${encodeURIComponent(ch.tvgId)}` : ''));
+    }
+
+    // AirPlay / PiP
+    $('#airplayBtn').onclick = ()=> {
+      const v = $('#player');
+      if (v && typeof v.webkitShowPlaybackTargetPicker === 'function'){ v.webkitShowPlaybackTargetPicker(); }
+      else alert('AirPlay wird von diesem Browser nicht unterstützt.');
+    };
+    $('#pipBtn').onclick = async ()=> {
+      const v = $('#player');
+      try{
+        if (document.pictureInPictureElement){ await document.exitPictureInPicture(); }
+        else { await v.requestPictureInPicture(); }
+      }catch(e){ alert('Bild-in-Bild nicht verfügbar: ' + e.message); }
+    };
+
+    // Events
+    $('#loadUrlBtn').onclick = handleUrlLoad;
+    $('#m3uUrl').addEventListener('keydown', e=>{ if (e.key==='Enter') handleUrlLoad(); });
+    $('#m3uFile').addEventListener('change', e=>{ if (e.target.files[0]) handleFileLoad(e.target.files[0]); });
+    $('#search').addEventListener('input', renderChannels);
+    $('#groups').addEventListener('change', renderChannels);
+    $('#showFavsBtn').addEventListener('click', ()=>{ state.showFavs = !state.showFavs; renderChannels(); $('#showFavsBtn').classList.toggle('on', state.showFavs); });
+
+    // PWA install prompt
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e)=>{
+      e.preventDefault(); deferredPrompt = e; $('#installBtn').hidden = false;
+    });
+    $('#installBtn').onclick = async ()=>{
+      if (!deferredPrompt) return alert('Öffne die Seite in Safari und nutze „Zum Home-Bildschirm“.');
+      deferredPrompt.prompt(); deferredPrompt = null; $('#installBtn').hidden = true;
+    };
+
+    // Restore last URL
+    (function init(){
+      const last = localStorage.getItem('iptv-last-url');
+      if (last){ $('#m3uUrl').value = last; }
+      // Service Worker
+      if ('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js'); }
+    })();
+  </script>
+</body>
+</html>
