@@ -4,54 +4,233 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>IPTV Player</title>
-
+  
   <!-- iOS Web App -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.json">
-  <!-- Removed apple-touch-icon -->
 
   <style>
-    :root { --bg:#0f1115; --fg:#e7e9ee; --muted:#9aa4b2; --accent:#6aa6ff; --card:#171a21; }
+    /*
+      Modern theme variables – these colours and spacing values aim for a
+      crisp, premium look. You can tweak them here to customise the
+      appearance further. The card backgrounds are a little lighter than the
+      page background and the accent colour provides contrast for buttons
+      and highlights.
+    */
+    :root {
+      --bg: #0d1117;
+      --fg: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #1f6feb;
+      --card: #161b22;
+      --border: #30363d;
+    }
+
     *{box-sizing:border-box}
     html,body{height:100%}
-    body{margin:0;background:var(--bg);color:var(--fg);font:16px system-ui, -apple-system, Segoe UI, Roboto, sans-serif}
-    header{padding:12px 16px;border-bottom:1px solid #222;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#0b0d11;position:sticky;top:0;z-index:9}
-    header h1{margin:0;font-size:18px;font-weight:600}
-    header input[type="url"], header input[type="text"]{flex:1;min-width:220px;padding:10px 12px;border-radius:10px;border:1px solid #2a2f3a;background:var(--card);color:var(--fg);outline:none}
-    header .btn{padding:10px 14px;border-radius:10px;border:1px solid #2a2f3a;background:#1f2530;color:var(--fg);cursor:pointer}
-    header .btn:hover{border-color:#3a4252}
-    main{display:grid;grid-template-columns:340px 1fr;gap:12px;height:calc(100% - 62px)}
-    @media (max-width:900px){ main{grid-template-columns:1fr} #right{order:-1} }
-    #left{padding:12px;overflow:auto}
-    #right{padding:12px}
-    .card{background:var(--card);border:1px solid #232834;border-radius:14px;overflow:hidden}
-    .section{padding:12px;border-top:1px solid #1f232c}
-    #playlistInfo{padding:10px 12px;font-size:14px;color:var(--muted)}
-    #searchRow{display:flex;gap:8px}
-    #groups{width:40%}
-    #channels{max-height:50vh;overflow:auto}
-    .channel{display:flex;gap:10px;align-items:center;padding:10px 12px;border-top:1px solid #1f232c;cursor:pointer}
-    .channel:hover{background:#1a1f29}
-    .logo{width:32px;height:32px;border-radius:6px;background:#111;object-fit:contain}
-    .meta{display:flex;flex-direction:column;min-width:0}
-    .name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .sub{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .fav{margin-left:auto;font-size:18px;color:#f4d35e;opacity:.6}
-    .fav.on{opacity:1}
-    video{width:100%;max-height:70vh;background:#000;border-radius:14px;display:block}
-    #nowPlaying{padding:8px 0;color:var(--muted);font-size:14px}
-    .hint{font-size:12px;color:var(--muted)}
-    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--fg);
+      font:16px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      line-height:1.5;
+    }
+
+    /* Header and tabs */
+    header{
+      padding:16px;
+      border-bottom:1px solid var(--border);
+      background:var(--card);
+      position:sticky;
+      top:0;
+      z-index:9;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    header h1{
+      margin:0;
+      font-size:20px;
+      font-weight:600;
+      letter-spacing:0.5px;
+    }
+    nav#loginTabs{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    nav#loginTabs .tab{
+      padding:8px 12px;
+      border:1px solid var(--border);
+      border-radius:8px;
+      background:var(--card);
+      color:var(--muted);
+      cursor:pointer;
+      transition:background 0.2s ease, color 0.2s ease;
+    }
+    nav#loginTabs .tab.active{
+      background:var(--accent);
+      color:#ffffff;
+      border-color:var(--accent);
+    }
+
+    /* Login forms */
+    #loginForms{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .login-tab{display:none;}
+    .login-tab.active{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+    .login-tab input[type="url"], .login-tab input[type="text"], .login-tab input[type="password"], .login-tab select{
+      flex:1;
+      min-width:200px;
+      padding:10px 12px;
+      border-radius:8px;
+      border:1px solid var(--border);
+      background:var(--bg);
+      color:var(--fg);
+      outline:none;
+    }
+    .login-tab button{
+      padding:10px 16px;
+      border-radius:8px;
+      border:none;
+      background:var(--accent);
+      color:#fff;
+      font-weight:500;
+      cursor:pointer;
+      transition:background 0.2s ease;
+    }
+    .login-tab button:hover{
+      background:var(--accent-hover);
+    }
+
+    #installBtn{
+      align-self:flex-start;
+      margin-top:4px;
+      padding:8px 12px;
+      border-radius:8px;
+      border:none;
+      background:var(--border);
+      color:var(--muted);
+      font-size:14px;
+      cursor:pointer;
+      display:none;
+    }
+
+    /* Layout */
+    main{
+      display:grid;
+      grid-template-columns:320px 1fr;
+      gap:16px;
+      height:calc(100% - 160px);
+    }
+    @media (max-width:900px){
+      main{grid-template-columns:1fr;}
+      #right{order:-1;}
+    }
+    #left{padding:16px;overflow:auto;}
+    #right{padding:16px;}
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:16px;
+      box-shadow:0 2px 6px rgba(0,0,0,0.3);
+      overflow:hidden;
+    }
+    .section{padding:12px;border-top:1px solid var(--border);}
+    #playlistInfo{padding:12px;font-size:14px;color:var(--muted);}
+    #searchRow{display:flex;gap:8px;flex-wrap:wrap;}
+    #groups{width:40%;}
+    #channels{max-height:60vh;overflow:auto;}
+    .channel{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      padding:12px;
+      border-top:1px solid var(--border);
+      cursor:pointer;
+      transition:background 0.1s ease;
+    }
+    .channel:hover{
+      background:rgba(88,166,255,0.08);
+    }
+    .logo{
+      width:40px;
+      height:40px;
+      border-radius:8px;
+      background:#111;
+      object-fit:contain;
+    }
+    .meta{display:flex;flex-direction:column;min-width:0;gap:2px;}
+    .name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .sub{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .fav{
+      margin-left:auto;
+      font-size:20px;
+      color:#f4d35e;
+      opacity:0.5;
+      cursor:pointer;
+      transition:opacity 0.2s;
+    }
+    .fav.on{opacity:1;}
+    .fav:hover{opacity:0.8;}
+
+    video{
+      width:100%;
+      max-height:70vh;
+      background:#000;
+      border-radius:16px;
+      display:block;
+    }
+    #nowPlaying{padding:8px 0;color:var(--muted);font-size:14px;}
+    .hint{font-size:12px;color:var(--muted);}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+    .btn{
+      padding:8px 12px;
+      border-radius:8px;
+      border:none;
+      background:var(--accent);
+      color:#fff;
+      font-size:14px;
+      cursor:pointer;
+      transition:background 0.2s ease;
+    }
+    .btn:hover{background:var(--accent-hover);}
   </style>
 </head>
 <body>
   <header>
     <h1>IPTV Player</h1>
-    <input id="m3uUrl" type="url" placeholder="M3U/M3U8 URL einfügen…" enterkeyhint="go">
-    <button class="btn" id="loadUrlBtn">Laden</button>
-    <input id="m3uFile" type="file" accept=".m3u,.m3u8" class="btn">
-    <button class="btn" id="installBtn" hidden>Zum Home-Bildschirm</button>
+    <nav id="loginTabs">
+      <button class="tab active" data-target="m3uTab">M3U/M3U8</button>
+      <button class="tab" data-target="xtreamTab">Xtream Codes</button>
+      <button class="tab" data-target="stalkerTab">Stalker Portal</button>
+    </nav>
+    <div id="loginForms">
+      <div class="login-tab active" id="m3uTab">
+        <input id="m3uUrl" type="url" placeholder="M3U/M3U8 URL einfügen…" enterkeyhint="go">
+        <button id="loadUrlBtn">Laden</button>
+        <input id="m3uFile" type="file" accept=".m3u,.m3u8">
+      </div>
+      <div class="login-tab" id="xtreamTab">
+        <input id="xtreamServer" type="url" placeholder="Xtream Server URL (z. B. https://example.com:8080)">
+        <input id="xtreamUsername" type="text" placeholder="Benutzername">
+        <input id="xtreamPassword" type="password" placeholder="Passwort">
+        <button id="loadXtreamBtn">Anmelden</button>
+      </div>
+      <div class="login-tab" id="stalkerTab">
+        <input id="stalkerPortal" type="url" placeholder="Stalker Portal URL">
+        <input id="stalkerUsername" type="text" placeholder="Benutzername">
+        <input id="stalkerPassword" type="password" placeholder="Passwort">
+        <button id="loadStalkerBtn">Anmelden</button>
+      </div>
+    </div>
+    <button id="installBtn">Zum Home‑Bildschirm</button>
   </header>
 
   <main>
@@ -64,17 +243,17 @@
           <button class="btn" id="showFavsBtn" title="Favoriten umschalten">★</button>
         </div>
         <div id="channels"></div>
-        <div class="section hint">Hinweis: Manche Streams erfordern HLS (.m3u8). DRM-geschützte Streams funktionieren nicht im Browser.</div>
+        <div class="section hint">Hinweis: Streams im HLS‑Format (.m3u8) werden nativ unterstützt. DRM‑geschützte Streams funktionieren nicht im Browser.</div>
       </div>
     </section>
 
     <section id="right">
-      <div class="card" style="padding:12px">
+      <div class="card" style="padding:16px">
         <video id="player" playsinline controls x-webkit-airplay="allow"></video>
         <div id="nowPlaying">—</div>
         <div class="row">
           <button class="btn" id="airplayBtn">AirPlay</button>
-          <button class="btn" id="pipBtn">Bild-in-Bild</button>
+          <button class="btn" id="pipBtn">Bild‑in‑Bild</button>
           <a class="btn" id="openExtern" href="#" target="_blank" rel="noopener">Extern öffnen</a>
         </div>
       </div>
@@ -154,7 +333,7 @@
         const img = document.createElement('img');
         img.className = 'logo';
         img.loading = 'lazy';
-        img.src = ch.logo || 'data:image/gif;base64,R0lGODlhAQABAIAAAP///////yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+        img.src = ch.logo || 'data:image/gif;base64,R0lGODlhAQABAIAAAP//////yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
         const meta = document.createElement('div'); meta.className = 'meta';
         const name = document.createElement('div'); name.className = 'name'; name.textContent = ch.name;
         const sub = document.createElement('div'); sub.className = 'sub'; sub.textContent = ch.group || ch.tvgId || ch.url;
@@ -217,10 +396,10 @@
       try{
         if (document.pictureInPictureElement){ await document.exitPictureInPicture(); }
         else { await v.requestPictureInPicture(); }
-      }catch(e){ alert('Bild-in-Bild nicht verfügbar: ' + e.message); }
+      }catch(e){ alert('Bild‑in‑Bild nicht verfügbar: ' + e.message); }
     };
 
-    // Events
+    // Search / groups / favorites events
     $('#loadUrlBtn').onclick = handleUrlLoad;
     $('#m3uUrl').addEventListener('keydown', e=>{ if (e.key==='Enter') handleUrlLoad(); });
     $('#m3uFile').addEventListener('change', e=>{ if (e.target.files[0]) handleFileLoad(e.target.files[0]); });
@@ -228,14 +407,80 @@
     $('#groups').addEventListener('change', renderChannels);
     $('#showFavsBtn').addEventListener('click', ()=>{ state.showFavs = !state.showFavs; renderChannels(); $('#showFavsBtn').classList.toggle('on', state.showFavs); });
 
+    // Login tab switching
+    function switchTab(tabId) {
+      document.querySelectorAll('#loginTabs .tab').forEach(btn=>{
+        btn.classList.toggle('active', btn.getAttribute('data-target') === tabId);
+      });
+      document.querySelectorAll('.login-tab').forEach(div=>{
+        div.classList.toggle('active', div.id === tabId);
+      });
+    }
+    document.querySelectorAll('#loginTabs .tab').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        switchTab(btn.getAttribute('data-target'));
+      });
+    });
+
+    async function handleXtreamLogin(){
+      const server = $('#xtreamServer').value.trim().replace(/\/+$/, '');
+      const user = $('#xtreamUsername').value.trim();
+      const pass = $('#xtreamPassword').value;
+      if (!server || !user || !pass){
+        alert('Bitte Server, Benutzername und Passwort eingeben.');
+        return;
+      }
+      let url = `${server}/get.php?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}&type=m3u_plus&output=m3u8`;
+      try{
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('HTTP '+resp.status);
+        const text = await resp.text();
+        state.channels = parseM3U(text);
+        $('#playlistInfo').textContent = `Xtream: ${state.channels.length} Kanäle geladen`;
+        populateGroups(); renderChannels();
+      }catch(e){
+        $('#playlistInfo').textContent = 'Fehler bei Xtream‑Login: ' + e.message + ' (Hinweis: CORS kann das Laden blockieren).';
+      }
+    }
+
+    async function handleStalkerLogin(){
+      const portal = $('#stalkerPortal').value.trim().replace(/\/+$/, '');
+      const user = $('#stalkerUsername').value.trim();
+      const pass = $('#stalkerPassword').value;
+      if (!portal || !user || !pass){
+        alert('Bitte Portal, Benutzername und Passwort eingeben.');
+        return;
+      }
+      let url = `${portal}/get.php?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}&type=m3u_plus&output=m3u8`;
+      try{
+        let resp = await fetch(url);
+        if (!resp.ok){
+          // try alternate Stalker endpoint
+          url = `${portal}/c/portal.php?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}&type=m3u`;
+          resp = await fetch(url);
+        }
+        if (!resp.ok) throw new Error('HTTP '+resp.status);
+        const text = await resp.text();
+        state.channels = parseM3U(text);
+        $('#playlistInfo').textContent = `Portal: ${state.channels.length} Kanäle geladen`;
+        populateGroups(); renderChannels();
+      }catch(e){
+        $('#playlistInfo').textContent = 'Fehler bei Portal‑Login: ' + e.message + ' (Hinweis: CORS kann das Laden blockieren).';
+      }
+    }
+
+    // Attach login buttons
+    $('#loadXtreamBtn').addEventListener('click', handleXtreamLogin);
+    $('#loadStalkerBtn').addEventListener('click', handleStalkerLogin);
+
     // PWA install prompt
     let deferredPrompt;
     window.addEventListener('beforeinstallprompt', (e)=>{
-      e.preventDefault(); deferredPrompt = e; $('#installBtn').hidden = false;
+      e.preventDefault(); deferredPrompt = e; $('#installBtn').style.display = 'inline-block';
     });
     $('#installBtn').onclick = async ()=>{
-      if (!deferredPrompt) return alert('Öffne die Seite in Safari und nutze „Zum Home-Bildschirm“.');
-      deferredPrompt.prompt(); deferredPrompt = null; $('#installBtn').hidden = true;
+      if (!deferredPrompt) return alert('Öffne die Seite in Safari und nutze „Zum Home‑Bildschirm“.');
+      deferredPrompt.prompt(); deferredPrompt = null; $('#installBtn').style.display = 'none';
     };
 
     // Restore last URL
